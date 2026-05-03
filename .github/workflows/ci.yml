@@ -6,11 +6,11 @@ on:
       - main
     paths:
       - src/**
-      - .github/workflows/ci.yml
+      - .github/workflows/**.yml
   pull_request:
     paths:
       - src/**
-      - .github/workflows/ci.yml
+      - .github/workflows/**.yml
   workflow_dispatch:
 
 permissions:
