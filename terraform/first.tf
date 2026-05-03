@@ -31,7 +31,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_lambda_function" "getAllWords" {
+resource "aws_lambda_function" "getAllWords_function" {
   function_name    = "getAllWords"
   role             = aws_iam_role.commonRole.arn
   handler          = "index.getAllWordsHandler"
@@ -42,4 +42,38 @@ resource "aws_lambda_function" "getAllWords" {
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic
   ]
+}
+
+resource "aws_apigatewayv2_api" "api" {
+  name          = "yesenian-api"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "getAllWords_integration" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.getAllWords_function.invoke_arn
+  integration_method     = "GET"
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "getAllWords_route" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "GET /words"
+  target    = "integrations/${aws_apigatewayv2_integration.getAllWords_integration.id}"
+}
+
+resource "aws_apigatewayv2_stage" "default" {
+  api_id      = aws_apigatewayv2_api.api.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "getAllWords_permission" {
+  statement_id  = "AllowAPIGatewayInvokeGetAllWords"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.getAllWords_function.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
