@@ -60,6 +60,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
+          disable-retry: true
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
