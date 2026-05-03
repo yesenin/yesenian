@@ -1,12 +1,13 @@
 # yesenian
+
 AWS backend for word games
 
 TODO:
 
-[ ] Lambda skeleton
+- [x] Lambda skeleton
 
-[ ] Terraform for lambdas (POST, GET)
+- [ ] Terraform for lambdas (POST, GET)
 
-[ ] Terraform for Dynamo (1 table)
+- [ ] Terraform for Dynamo (1 table)
 
-[ ] e2e
+- [ ] e2e
