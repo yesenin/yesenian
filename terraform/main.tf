@@ -1,7 +1,15 @@
 terraform {
+  backend "s3" {
+    bucket         = "tfstate-yesenian-data1"
+    key            = "app/terraform.tfstate"
+    region         = "eu-north-1"
+    use_lockfile   = true
+    encrypt        = true
+  }
   required_providers {
     aws = {
       source = "hashicorp/aws"
+      version = ">= 6.43.0"
     }
   }
 }
@@ -53,7 +61,7 @@ resource "aws_apigatewayv2_integration" "getAllWords_integration" {
   api_id                 = aws_apigatewayv2_api.api.id
   integration_type       = "AWS_PROXY"
   integration_uri        = aws_lambda_function.getAllWords_function.invoke_arn
-  integration_method     = "GET"
+  integration_method     = "POST"
   payload_format_version = "2.0"
 }
 
@@ -76,4 +84,51 @@ resource "aws_lambda_permission" "getAllWords_permission" {
   principal     = "apigateway.amazonaws.com"
 
   source_arn = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
+}
+
+resource "aws_dynamodb_table" "yesenian_vocabulary_table" {
+  name         = "yesenian-vocabulary"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "Language"
+  range_key    = "Id"
+
+  attribute {
+    name = "Id"
+    type = "S"
+  }
+
+  attribute {
+    name = "Language"
+    type = "S"
+  }
+}
+
+data "aws_iam_policy_document" "yesenian_vocabulary_table_lambda_policy" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:Scan",
+      "dynamodb:Query"
+    ]
+
+    resources = [
+      aws_dynamodb_table.yesenian_vocabulary_table.arn,
+      "${aws_dynamodb_table.yesenian_vocabulary_table.arn}/index/*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "yesenian_vocabulary_table_lambda_policy" {
+  name   = "yesenian-vocabulary-table-lambda-policy"
+  policy = data.aws_iam_policy_document.yesenian_vocabulary_table_lambda_policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "yesenian_vocabulary_table_lambda_policy_attachment" {
+  role       = aws_iam_role.commonRole.name
+  policy_arn = aws_iam_policy.yesenian_vocabulary_table_lambda_policy.arn
 }

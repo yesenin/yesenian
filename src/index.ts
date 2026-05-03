@@ -1,13 +1,17 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";
+import { WordsService } from "./db";
 
-export const getAllWordsHandler: APIGatewayProxyHandlerV2 = async (event) => ({
-  statusCode: 200,
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({
-    message: "Hello from Lambda " + new Date().toISOString(),
-    path: event.rawPath,
-  }),
-});
+export const getAllWordsHandler: APIGatewayProxyHandlerV2 = async (event) => {
+  const dbService = new WordsService();
+  const words = await dbService.getAll();
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      words,
+    }),
+  };
+};
 
 interface AddWordRequest {
   ruWord: string;
