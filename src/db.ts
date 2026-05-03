@@ -6,16 +6,7 @@ import {
   ScanCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
-
-export type Word = {
-  id: string;
-  ru: string;
-  sr_cyr?: string;
-  sr_lat?: string;
-  tags?: string[];
-  addedAt: string;
-  modifiedAt: string;
-};
+import { Word } from "./models";
 
 const dynamoClient = new DynamoDBClient({
   region: "eu-north-1", //process.env.AWS_REGION ?? "eu-north-1",

@@ -52,6 +52,19 @@ resource "aws_lambda_function" "getAllWords_function" {
   ]
 }
 
+resource "aws_lambda_function" "addWord_function" {
+  function_name    = "addWord"
+  role             = aws_iam_role.commonRole.arn
+  handler          = "index.addWordHandler"
+  runtime          = "nodejs22.x"
+  filename         = "../src/dist/lambda.zip"
+  source_code_hash = filebase64sha256("../src/dist/lambda.zip")
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_basic
+  ]
+}
+
 resource "aws_apigatewayv2_api" "api" {
   name          = "yesenian-api"
   protocol_type = "HTTP"
@@ -65,10 +78,24 @@ resource "aws_apigatewayv2_integration" "getAllWords_integration" {
   payload_format_version = "2.0"
 }
 
+resource "aws_apigatewayv2_integration" "addWord_integration" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.addWord_function.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
+
 resource "aws_apigatewayv2_route" "getAllWords_route" {
   api_id    = aws_apigatewayv2_api.api.id
   route_key = "GET /words"
   target    = "integrations/${aws_apigatewayv2_integration.getAllWords_integration.id}"
+}
+
+resource "aws_apigatewayv2_route" "addWord_route" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "POST /words"
+  target    = "integrations/${aws_apigatewayv2_integration.addWord_integration.id}"
 }
 
 resource "aws_apigatewayv2_stage" "default" {
@@ -86,19 +113,28 @@ resource "aws_lambda_permission" "getAllWords_permission" {
   source_arn = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "addWord_permission" {
+  statement_id  = "AllowAPIGatewayInvokeAddWord"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.addWord_function.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
+}
+
 resource "aws_dynamodb_table" "yesenian_vocabulary_table" {
   name         = "yesenian-vocabulary"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "Language"
-  range_key    = "Id"
+  hash_key     = "language"
+  range_key    = "id"
 
   attribute {
-    name = "Id"
+    name = "id"
     type = "S"
   }
 
   attribute {
-    name = "Language"
+    name = "language"
     type = "S"
   }
 }
