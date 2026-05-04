@@ -6,6 +6,8 @@ export interface Word {
   tags?: Tag[];
   initForm?: boolean;
   kind: string;
+  draft?: boolean;
+  source: string;
   addedAt: string;
   modifiedAt: string;
 }
