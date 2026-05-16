@@ -167,6 +167,10 @@ async function handleMessage(chatId: number, userId: number, text: string) {
             { text: "Сербский", callback_data: "lang:sr" },
             { text: "Армянский", callback_data: "lang:hy" },
           ],
+          [
+            { text: "Японский", callback_data: "lang:jp" },
+            { text: "Шведский", callback_data: "lang:sv" },
+          ],
           [{ text: "Другой", callback_data: "lang:other" }],
         ],
       },
