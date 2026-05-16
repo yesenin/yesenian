@@ -49,6 +49,7 @@ interface AddWordRequest {
   language: string;
   quickTranslation: string;
   kind: string;
+  tags?: string[];
 }
 
 const AddWordRequestSchema = z.object({
@@ -56,6 +57,7 @@ const AddWordRequestSchema = z.object({
   language: z.string().min(2),
   quickTranslation: z.string().min(2),
   kind: z.string().min(2),
+  tags: z.array(z.string()).optional(),
 });
 
 export const addWordHandler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -96,6 +98,7 @@ export const addWordHandler: APIGatewayProxyHandlerV2 = async (event) => {
     source: "api",
     addedAt: new Date().toISOString(),
     modifiedAt: new Date().toISOString(),
+    tags: parsedBody.tags,
   };
 
   await wordService.create(newWord);
@@ -109,14 +112,7 @@ export const addWordHandler: APIGatewayProxyHandlerV2 = async (event) => {
   };
 };
 
-const token = "7683625285:AAGnC5gDkPLserb-pZcEpPuGQ00McdfPmPY"; //process.env.TELEGRAM_BOT_TOKEN!;
-
-type TelegramUpdate = {
-  message?: {
-    chat: { id: number };
-    text?: string;
-  };
-};
+const token = "8636794064:AAEy7fBhzEWkmgfrytmsWfX-KtnsL-e_qNs"; //process.env.TELEGRAM_BOT_TOKEN!;
 
 async function sendMessage(chatId: number, text: string, extra?: object) {
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -157,16 +153,21 @@ async function handleMessage(chatId: number, userId: number, text: string) {
     await botService.saveSession({
       userId: String(userId),
       step: "language",
-      expiresAt: now + 60 * 60,
+      expiresAt: now + 60 * 10,
     });
 
     await sendMessage(chatId, "Выбери язык:", {
       reply_markup: {
         inline_keyboard: [
-          // [{ text: "English", callback_data: "lang:en-US" }],
-          // [{ text: "French", callback_data: "lang:fr-FR" }],
-          [{ text: "Сербский", callback_data: "lang:sr-RS" }],
-          [{ text: "Армянский", callback_data: "lang:hy-AM" }],
+          [
+            { text: "Английский", callback_data: "lang:en" },
+            { text: "Французский", callback_data: "lang:fr" },
+          ],
+          [
+            { text: "Сербский", callback_data: "lang:sr" },
+            { text: "Армянский", callback_data: "lang:hy" },
+          ],
+          [{ text: "Другой", callback_data: "lang:other" }],
         ],
       },
     });
@@ -185,7 +186,7 @@ async function handleMessage(chatId: number, userId: number, text: string) {
         ...session,
         ruWord: text,
         step: "translation",
-        expiresAt: now + 60 * 60,
+        expiresAt: now + 60 * 10,
       });
 
       await sendMessage(chatId, "Теперь введи перевод:");
@@ -196,16 +197,32 @@ async function handleMessage(chatId: number, userId: number, text: string) {
         ...session,
         translation: text,
         step: "word_kind",
-        expiresAt: now + 60 * 60,
+        expiresAt: now + 60 * 10,
       });
 
       await sendMessage(chatId, "Выбери тип слова:", {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "существительное", callback_data: "kind:noun" }],
-            [{ text: "глагол", callback_data: "kind:verb" }],
-            [{ text: "прилагательное", callback_data: "kind:adjective" }],
-            [{ text: "фраза", callback_data: "kind:phrase" }],
+            [
+              { text: "существительное", callback_data: "kind:noun" },
+              { text: "глагол", callback_data: "kind:verb" },
+              { text: "прилагательное", callback_data: "kind:adjective" },
+            ],
+            [
+              { text: "наречие", callback_data: "kind:adverb" },
+              { text: "местоимение", callback_data: "kind:pronoun" },
+              { text: "предлог", callback_data: "kind:preposition" },
+            ],
+            [
+              { text: "числительное", callback_data: "kind:numeral" },
+              { text: "союз", callback_data: "kind:conjunction" },
+              { text: "междометие", callback_data: "kind:interjection" },
+            ],
+            [
+              { text: "частица", callback_data: "kind:particle" },
+              { text: "другое", callback_data: "kind:other" },
+              { text: "фраза", callback_data: "kind:phrase" },
+            ],
           ],
         },
       });
@@ -232,15 +249,15 @@ async function handleCallbackQuery(callbackQuery: any) {
       ...session,
       language,
       step: "ru_word",
-      expiresAt: now + 60 * 60,
+      expiresAt: now + 60 * 10,
     });
 
-    await sendMessage(chatId, "Введи русское слово:");
+    await sendMessage(chatId, "Введи русский перевод:");
     return;
   }
 
   if (session.step === "word_kind" && data.startsWith("kind:")) {
-    const wordKind = data.replace("type:", "");
+    const wordKind = data.replace("kind:", "");
 
     await wordService.create({
       language: session.language!,
