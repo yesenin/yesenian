@@ -1,0 +1,1 @@
+export { getWordByIdHandler } from "./lambdaHandlers";

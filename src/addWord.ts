@@ -1,0 +1,1 @@
+export { addWordHandler } from "./lambdaHandlers";

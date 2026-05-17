@@ -1,0 +1,1 @@
+export { scanHandler } from "./lambdaHandlers";

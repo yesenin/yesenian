@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.js",
-    "zip": "npm run build && cd dist && zip -r ../dist/lambda.zip ."
+    "clean": "rm -rf dist && mkdir -p dist",
+    "build": "npm run clean && esbuild scan.ts getWordById.ts addWord.ts bot.ts --bundle --minify --platform=node --target=node22 --format=cjs --outdir=dist --entry-names=[name]/index",
+    "zip": "npm run build && node scripts/package-lambdas.mjs"
   },
   "keywords": [],
   "author": "",

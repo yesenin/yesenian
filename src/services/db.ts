@@ -6,7 +6,7 @@ import {
   ScanCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { Word } from "./models";
+import { Note, Word } from "../models";
 
 const dynamoClient = new DynamoDBClient({
   region: "eu-north-1", //process.env.AWS_REGION ?? "eu-north-1",
@@ -15,14 +15,17 @@ const dynamoClient = new DynamoDBClient({
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 const vocabularyTableName = "yesenian-vocabulary"; //process.env.WORDS_TABLE_NAME ?? "Words";
-
-const botTableName = "yesenian-bot-state"; //process.env.BOT_TABLE_NAME ?? "BotState";
+const notesTableName = "yesenian-queue"; //process.env.NOTES_TABLE_NAME ?? "Notes";
 
 export class WordsService {
-  async getAll(): Promise<Word[]> {
+  async scan(ruQuery: string): Promise<Word[]> {
     const result = await docClient.send(
       new ScanCommand({
         TableName: vocabularyTableName,
+        FilterExpression: "contains(ru, :ruQuery)",
+        ExpressionAttributeValues: {
+          ":ruQuery": ruQuery,
+        },
       }),
     );
 
@@ -63,44 +66,50 @@ export class WordsService {
       }),
     );
   }
+
+  async getRandom(): Promise<Word | null> {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: vocabularyTableName,
+        ProjectionExpression: "id, #lang",
+        ExpressionAttributeNames: {
+          "#lang": "language",
+        },
+      }),
+    );
+    const items = result.Items ?? [];
+
+    const randomItem = items[Math.floor(Math.random() * items.length)];
+    const word = await docClient.send(
+      new GetCommand({
+        TableName: vocabularyTableName,
+        Key: {
+          id: randomItem.id,
+          language: randomItem.language,
+        },
+      }),
+    );
+    return word.Item ? (word.Item as Word) : null;
+  }
 }
 
-export type Session = {
-  userId: string;
-  step: "language" | "ru_word" | "translation" | "word_kind";
-  language?: string;
-  ruWord?: string;
-  translation?: string;
-  expiresAt: number;
-};
-
-export class BotService {
-  async getSession(userId: number): Promise<Session | null> {
-    const res = await dynamoClient.send(
-      new GetCommand({
-        TableName: botTableName,
-        Key: { userId: String(userId) },
-      }),
-    );
-
-    return (res.Item as Session) ?? null;
-  }
-
-  async saveSession(session: Session) {
-    await dynamoClient.send(
+export class NotesService {
+  async create(note: Note): Promise<void> {
+    await docClient.send(
       new PutCommand({
-        TableName: botTableName,
-        Item: session,
+        TableName: notesTableName,
+        Item: note,
       }),
     );
   }
 
-  async deleteSession(userId: number) {
-    await dynamoClient.send(
-      new DeleteCommand({
-        TableName: botTableName,
-        Key: { userId: String(userId) },
+  async getAll(): Promise<Note[]> {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: notesTableName,
       }),
     );
+
+    return (result.Items ?? []) as Note[];
   }
 }

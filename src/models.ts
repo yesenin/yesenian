@@ -1,3 +1,5 @@
+import { int } from "zod";
+
 export interface Word {
   id: string;
   ru: string;
@@ -22,4 +24,10 @@ export interface Tag {
   id: string;
   key: string;
   value: string;
+}
+
+export interface Note {
+  id: string;
+  text: string;
+  createdAt: string;
 }

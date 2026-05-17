@@ -39,13 +39,13 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_lambda_function" "getAllWords_function" {
-  function_name    = "getAllWords"
+resource "aws_lambda_function" "scan_function" {
+  function_name    = "scan"
   role             = aws_iam_role.commonRole.arn
-  handler          = "index.getAllWordsHandler"
+  handler          = "index.scanHandler"
   runtime          = "nodejs22.x"
-  filename         = "../src/dist/lambda.zip"
-  source_code_hash = filebase64sha256("../src/dist/lambda.zip")
+  filename         = "../src/dist/scan.zip"
+  source_code_hash = filebase64sha256("../src/dist/scan.zip")
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic
@@ -57,8 +57,8 @@ resource "aws_lambda_function" "getWordById_function" {
   role             = aws_iam_role.commonRole.arn
   handler          = "index.getWordByIdHandler"
   runtime          = "nodejs22.x"
-  filename         = "../src/dist/lambda.zip"
-  source_code_hash = filebase64sha256("../src/dist/lambda.zip")
+  filename         = "../src/dist/getWordById.zip"
+  source_code_hash = filebase64sha256("../src/dist/getWordById.zip")
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic
@@ -70,8 +70,8 @@ resource "aws_lambda_function" "addWord_function" {
   role             = aws_iam_role.commonRole.arn
   handler          = "index.addWordHandler"
   runtime          = "nodejs22.x"
-  filename         = "../src/dist/lambda.zip"
-  source_code_hash = filebase64sha256("../src/dist/lambda.zip")
+  filename         = "../src/dist/addWord.zip"
+  source_code_hash = filebase64sha256("../src/dist/addWord.zip")
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic
@@ -85,6 +85,7 @@ resource "aws_apigatewayv2_api" "api" {
   cors_configuration {
     allow_origins = [
       "https://yesenin.github.io",
+      "https://yesenin.github.io/hy",
       "http://localhost:5173"
     ]
 
@@ -105,10 +106,10 @@ resource "aws_apigatewayv2_api" "api" {
   }
 }
 
-resource "aws_apigatewayv2_integration" "getAllWords_integration" {
+resource "aws_apigatewayv2_integration" "scan_integration" {
   api_id                 = aws_apigatewayv2_api.api.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.getAllWords_function.invoke_arn
+  integration_uri        = aws_lambda_function.scan_function.invoke_arn
   integration_method     = "POST"
   payload_format_version = "2.0"
 }
@@ -129,10 +130,10 @@ resource "aws_apigatewayv2_integration" "addWord_integration" {
   payload_format_version = "2.0"
 }
 
-resource "aws_apigatewayv2_route" "getAllWords_route" {
+resource "aws_apigatewayv2_route" "scan_route" {
   api_id    = aws_apigatewayv2_api.api.id
-  route_key = "GET /words"
-  target    = "integrations/${aws_apigatewayv2_integration.getAllWords_integration.id}"
+  route_key = "GET /find"
+  target    = "integrations/${aws_apigatewayv2_integration.scan_integration.id}"
 }
 
 resource "aws_apigatewayv2_route" "getWordById_route" {
@@ -153,10 +154,10 @@ resource "aws_apigatewayv2_stage" "default" {
   auto_deploy = true
 }
 
-resource "aws_lambda_permission" "getAllWords_permission" {
-  statement_id  = "AllowAPIGatewayInvokeGetAllWords"
+resource "aws_lambda_permission" "scan_permission" {
+  statement_id  = "AllowAPIGatewayInvokeScan"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.getAllWords_function.function_name
+  function_name = aws_lambda_function.scan_function.function_name
   principal     = "apigateway.amazonaws.com"
 
   source_arn = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
@@ -197,6 +198,17 @@ resource "aws_dynamodb_table" "yesenian_vocabulary_table" {
   }
 }
 
+resource "aws_dynamodb_table" "yesenian_queue_table" {
+  name         = "yesenian-queue"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
+
 data "aws_iam_policy_document" "yesenian_vocabulary_table_lambda_policy" {
   statement {
     effect = "Allow"
@@ -217,6 +229,36 @@ data "aws_iam_policy_document" "yesenian_vocabulary_table_lambda_policy" {
   }
 }
 
+data "aws_iam_policy_document" "yesenian_queue_table_lambda_policy" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:Scan",
+      "dynamodb:Query"
+    ]
+
+    resources = [
+      aws_dynamodb_table.yesenian_queue_table.arn,
+      "${aws_dynamodb_table.yesenian_queue_table.arn}/index/*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "yesenian_queue_table_lambda_policy" {
+  name   = "yesenian-queue-table-lambda-policy"
+  policy = data.aws_iam_policy_document.yesenian_queue_table_lambda_policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "yesenian_queue_table_lambda_policy_attachment" {
+  role       = aws_iam_role.commonRole.name
+  policy_arn = aws_iam_policy.yesenian_queue_table_lambda_policy.arn
+}
+
 resource "aws_iam_policy" "yesenian_vocabulary_table_lambda_policy" {
   name   = "yesenian-vocabulary-table-lambda-policy"
   policy = data.aws_iam_policy_document.yesenian_vocabulary_table_lambda_policy.json
@@ -232,11 +274,13 @@ resource "aws_lambda_function" "telegram" {
   role             = aws_iam_role.commonRole.arn
   handler          = "index.botHandler"
   runtime          = "nodejs22.x"
-  filename         = "../src/dist/lambda.zip"
-  source_code_hash = filebase64sha256("../src/dist/lambda.zip")
+  filename         = "../src/dist/bot.zip"
+  source_code_hash = filebase64sha256("../src/dist/bot.zip")
 
   depends_on = [
-    aws_iam_role_policy_attachment.lambda_basic
+    aws_iam_role_policy_attachment.lambda_basic,
+    aws_iam_role_policy_attachment.yesenian_vocabulary_table_lambda_policy_attachment,
+    aws_iam_role_policy_attachment.yesenian_queue_table_lambda_policy_attachment
   ]
 }
 
